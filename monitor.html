@@ -1,27 +1,40 @@
 <!DOCTYPE html>
-<html>
-<style>
-  body { background: black; color: lime; font-size: 5rem; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-</style>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { background: #000; color: #0f0; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: 'Courier New', monospace; }
+        #output { font-size: 5vw; text-shadow: 0 0 10px #0f0; }
+    </style>
+</head>
 <body>
-  <div id="display">待機中...</div>
+    <div id="output">システム待機中...</div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
 
-    const firebaseConfig = { /* あなたのAPIキーなど */ };
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+        const firebaseConfig = {
+            apiKey: "AIzaSyDj3T3b4fdLD83kC_RAp2Wg5cFw7VE_x0s",
+            authDomain: "realtime-database-c26e9.firebaseapp.com",
+            projectId: "realtime-database-c26e9",
+            storageBucket: "realtime-database-c26e9.firebasestorage.app",
+            messagingSenderId: "397939201496",
+            appId: "1:397939201496:web:3b651c82fdbda090ee4ead",
+            databaseURL: "https://realtime-database-c26e9-default-rtdb.asia-northeast1.firebasedatabase.app"
+        };
 
-    // データベースの 'display/message' を監視
-    const msgRef = ref(db, 'display/message');
-    onValue(msgRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        document.getElementById('display').innerText = data;
-      }
-    });
-  </script>
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // 'mystery/displayText' を監視して、変わったら画面を書き換える
+        const displayRef = ref(db, 'mystery/displayText');
+        onValue(displayRef, (snapshot) => {
+            const val = snapshot.val();
+            if (val) {
+                document.getElementById('output').innerText = val;
+            }
+        });
+    </script>
 </body>
 </html>
