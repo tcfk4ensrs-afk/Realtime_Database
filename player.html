@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <h2>ミッション入力</h2>
+  <input type="password" id="pass" placeholder="パスワード">
+  <input type="text" id="msg" placeholder="表示する言葉">
+  <button onclick="sendData()">送信</button>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+    import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
+
+    const firebaseConfig = { /* あなたのAPIキーなど */ };
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    window.sendData = async () => {
+      const pass = document.getElementById('pass').value;
+      const msg = document.getElementById('msg').value;
+
+      if (pass === "1234") { // 簡易的なパスワード判定
+        await set(ref(db, 'display/message'), msg);
+        alert("送信完了！");
+      } else {
+        alert("パスワードが違います");
+      }
+    };
+  </script>
+</body>
+</html>
