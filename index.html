@@ -5,26 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>認証システム</title>
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 50px; }
+        body { font-family: sans-serif; text-align: center; padding: 20px; }
         .hidden { display: none; }
-        input { padding: 10px; font-size: 16px; width: 80%; max-width: 300px; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #28a745; color: white; border: none; border-radius: 5px; margin-top: 10px; }
+        input { padding: 10px; margin: 10px; width: 80%; max-width: 300px; }
+        button { padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; }
     </style>
 </head>
 <body>
     <div id="loading">確認中...</div>
 
-    <div id="register-ui" class="hidden">
+    <div id="reg-view" class="hidden">
         <h2>プレイヤー登録</h2>
-        <p>この端末で使用する名前を入力してください</p>
-        <input type="text" id="playerName" placeholder="例：プレイヤーA">
+        <p>あなたの名前を入力してください</p>
+        <input type="text" id="playerName" placeholder="名前">
         <br>
-        <button id="saveBtn">登録して進む</button>
+        <button id="regBtn">登録して開始</button>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
         import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
 
         const firebaseConfig = {
@@ -38,56 +37,51 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
         const db = getDatabase(app);
 
-        // URLから tag1, tag2, tag3 などを取得
+        // 1. このブラウザ独自のIDを取得（なければ作成）
+        let myId = localStorage.getItem('mystery_user_id');
+        if (!myId) {
+            myId = 'user_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('mystery_user_id', myId);
+        }
+
         const params = new URLSearchParams(window.location.search);
         const tagId = params.get('id');
 
-        async function checkAccess() {
+        async function init() {
             if (!tagId) {
-                document.body.innerText = "エラー：NFCタグからアクセスしてください。";
+                document.body.innerText = "エラー：NFCタグからアクセスしてください（?id=... がありません）";
                 return;
             }
 
-            // 匿名ログインで端末を識別
-            const userCredential = await signInAnonymously(auth);
-            const uid = userCredential.user.uid;
-
-            // データベースのタグ情報を参照
             const tagRef = ref(db, `tags/${tagId}`);
             const snapshot = await get(tagRef);
 
-            if (!snapshot.exists()) {
-                // 【未登録の場合】名前入力画面を表示
-                document.getElementById('loading').classList.add('hidden');
-                document.getElementById('register-ui').classList.remove('hidden');
+            document.getElementById('loading').classList.add('hidden');
 
-                document.getElementById('saveBtn').onclick = async () => {
+            if (!snapshot.exists()) {
+                // 【未登録】
+                document.getElementById('reg-view').classList.remove('hidden');
+                document.getElementById('regBtn').onclick = async () => {
                     const name = document.getElementById('playerName').value;
                     if (!name) return alert("名前を入力してください");
-                    
-                    await set(tagRef, { ownerId: uid, playerName: name });
-                    // 登録直後もplayer.htmlへ
+                    await set(tagRef, { ownerId: myId, playerName: name });
                     window.location.href = `player.html?id=${tagId}`;
                 };
             } else {
-                // 【登録済みの場合】
+                // 【登録済み】
                 const data = snapshot.val();
-                if (data.ownerId === uid) {
-                    // 本人なら player.html へ
+                if (data.ownerId === myId) {
                     window.location.href = `player.html?id=${tagId}`;
                 } else {
-                    // 他人なら player1.html へ
                     window.location.href = `player1.html?id=${tagId}`;
                 }
             }
         }
-
-        checkAccess().catch(err => {
+        init().catch(err => {
             console.error(err);
-            document.body.innerText = "エラーが発生しました。通信環境を確認してください。";
+            document.body.innerText = "データベースに接続できません。Firebaseのルールを確認してください。";
         });
     </script>
 </body>
