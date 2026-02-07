@@ -1,30 +1,45 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>プレイヤー操作パネル</title>
+</head>
 <body>
-  <h2>ミッション入力</h2>
-  <input type="password" id="pass" placeholder="パスワード">
-  <input type="text" id="msg" placeholder="表示する言葉">
-  <button onclick="sendData()">送信</button>
+    <h1>謎解き入力</h1>
+    <input type="text" id="pass" placeholder="パスワードを入力">
+    <input type="text" id="msg" placeholder="表示するメッセージ">
+    <button id="sendBtn">送信する</button>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-    import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+        import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
 
-    const firebaseConfig = { /* あなたのAPIキーなど */ };
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+        const firebaseConfig = {
+            apiKey: "AIzaSyDj3T3b4fdLD83kC_RAp2Wg5cFw7VE_x0s",
+            authDomain: "realtime-database-c26e9.firebaseapp.com",
+            projectId: "realtime-database-c26e9",
+            storageBucket: "realtime-database-c26e9.firebasestorage.app",
+            messagingSenderId: "397939201496",
+            appId: "1:397939201496:web:3b651c82fdbda090ee4ead",
+            // ⚠️ もしdatabaseURLがあればここに追加してください
+            databaseURL: "https://realtime-database-c26e9-default-rtdb.asia-northeast1.firebasedatabase.app"
+        };
 
-    window.sendData = async () => {
-      const pass = document.getElementById('pass').value;
-      const msg = document.getElementById('msg').value;
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
 
-      if (pass === "1234") { // 簡易的なパスワード判定
-        await set(ref(db, 'display/message'), msg);
-        alert("送信完了！");
-      } else {
-        alert("パスワードが違います");
-      }
-    };
-  </script>
+        document.getElementById('sendBtn').onclick = async () => {
+            const password = document.getElementById('pass').value;
+            const message = document.getElementById('msg').value;
+
+            // パスワードが合っていたら書き込み
+            if (password === "open") { 
+                await set(ref(db, 'mystery/displayText'), message);
+                alert("送信しました！モニターを確認してください。");
+            } else {
+                alert("パスワードが正しくありません。");
+            }
+        };
+    </script>
 </body>
 </html>
