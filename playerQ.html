@@ -7,9 +7,11 @@
     <style>
         body { font-family: sans-serif; text-align: center; padding: 20px; background: #eef2f3; }
         .box { max-width: 450px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .cipher { background: #eee; padding: 15px; font-size: 1.4rem; letter-spacing: 2px; border: 2px dashed #333; margin: 15px 0; font-weight: bold; }
-        input { padding: 12px; width: 80%; margin: 10px 0; border-radius: 5px; border: 1px solid #ccc; }
-        button { padding: 12px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .cipher-container { background: #eee; padding: 15px; border: 2px dashed #333; margin: 15px 0; }
+        .cipher { font-size: 1.6rem; letter-spacing: 2px; font-weight: bold; margin-bottom: 10px; }
+        .hint-text { font-size: 0.9rem; color: #d9534f; font-weight: bold; border-top: 1px solid #ccc; pt: 10px; margin-top: 10px; display: block; }
+        input { padding: 12px; width: 80%; margin: 10px 0; border-radius: 5px; border: 1px solid #ccc; font-size: 16px; }
+        button { padding: 12px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
     </style>
 </head>
 <body>
@@ -37,6 +39,12 @@
 
         const kanaMap = {'あ':'A','い':'I','う':'U','え':'E','お':'O','か':'KA','き':'KI','く':'KU','け':'KE','こ':'KO','さ':'SA','し':'SHI','す':'SU','せ':'SE','そ':'SO','た':'TA','ち':'CHI','つ':'TSU','て':'TE','と':'TO','な':'NA','に':'NI','ぬ':'NU','ね':'NE','の':'NO','は':'HA','ひ':'HI','ふ':'FU','へ':'HE','ほ':'HO','ま':'MA','み':'MI','む':'MU','め':'ME','も':'MO','や':'YA','ゆ':'YU','よ':'YO','ら':'RA','り':'RI','る':'RU','れ':'RE','ろ':'RO','わ':'WA','を':'WO','ん':'N'};
 
+        const messageMaster = {
+            "あした": "ら", "りんご": "す", "ごりら": "け",
+            "らっぱ": "て", "ぱんつ": "く", "つくえ": "れ",
+            "えんとつ": "て", "つみき": "あ", "きつつき": "り"
+        };
+
         function toCipher(name) {
             let roman = "";
             for (let char of name) { roman += kanaMap[char] || ""; }
@@ -46,36 +54,44 @@
         async function init() {
             const tagSnapshot = await get(ref(db, `tags/${tagId}`));
             const data = tagSnapshot.val();
+            if (!data) return;
 
             const cipherText = toCipher(data.playerName);
             document.getElementById('main-content').innerHTML = `
                 <h2>解析ミッション</h2>
-                <p>所有者：${data.playerName}</p>
-                <p>名前から導き出される暗号を解け</p>
-                <div class="cipher">${cipherText}</div>
+                <p>所有者：<strong>${data.playerName}</strong></p>
+                
+                <div class="cipher-container">
+                    <div class="cipher">${cipherText}</div>
+                    <span class="hint-text">答え＝1  19,8,9 20,1</span>
+                </div>
+
+                <p style="font-size: 0.8rem;">//※A=1, B=2, C=3...として読み解け</p>
                 <input type="text" id="ansInput" placeholder="答えを入力">
+                <br>
                 <button id="sendBtn">送信</button>
             `;
             document.getElementById('sendBtn').onclick = () => handleInput(document.getElementById('ansInput').value);
         }
 
         async function handleInput(val) {
-            const msgRef = ref(db, 'mystery/messages');
-            
-            // 正解判定リスト
-            const messageMaster = {"あした": "た", "くさり": "な"};
-            const result = messageMaster[val];
-            
+            const result = messageMaster[val.trim()];
             if (result) {
+                const msgRef = ref(db, 'mystery/messages');
                 const snap = await get(msgRef);
                 let list = snap.val() || [];
-                if (list.length >= 3) list = [];
+                
+                if (list.length >= 3) {
+                    const modeSnap = await get(ref(db, 'mystery/mode'));
+                    if (modeSnap.val() !== "special") list = [];
+                }
+                
                 list.push(result);
                 await set(msgRef, list);
-                alert("送信成功！モニターを確認してください。");
+                alert(`「${val}」を送信しました！モニターを確認してください。`);
                 document.getElementById('ansInput').value = "";
             } else {
-                alert("不正解");
+                alert("キーワードが正しくありません。");
             }
         }
         init();
