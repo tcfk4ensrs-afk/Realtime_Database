@@ -99,7 +99,17 @@
         const shutdownLine = document.getElementById('shutdown-line');
         let typeTimer = null;
         let currentMode = "normal";
-        let isFirstSpecial = true; // 初回演出フラグ
+        let isFirstSpecial = true;
+
+        // シャッフル関数
+        function shuffle(array) {
+            const arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
 
         function typeWriter(text, speed = 70) {
             if (typeTimer) clearInterval(typeTimer);
@@ -120,7 +130,13 @@
             return Array.from({length}, () => chars[Math.floor(Math.random()*chars.length)]).join("");
         }
 
-        // 豪華演出シーケンス
+        // 緊急モード時のリスト表示（シャッフル＋指定文言）
+      function showSpecialList(list) {
+    // shuffleを使わず、元のlistをそのままjoinする
+    const specialContent = "必要なキーワードをすべて送ってください。\n\n" + list.join("  ");
+    typeWriter(specialContent, 30);
+}
+
         async function triggerSpecialSequence(list) {
             outputElement.classList.add('corrupting');
             let count = 0;
@@ -154,12 +170,6 @@
             }
         }
 
-        function showSpecialList(list) {
-            const specialContent = "【緊急読込モード発動】\n全解析データを同期しました：\n\n" + list.join(" ");
-            typeWriter(specialContent, 30);
-        }
-
-        // メインロジック
         onValue(ref(db, 'mystery/mode'), (modeSnap) => {
             const nextMode = modeSnap.val();
             const messagesRef = ref(db, 'mystery/messages');
@@ -167,31 +177,29 @@
             onValue(messagesRef, (msgSnap) => {
                 const list = msgSnap.val() || [];
                 
-                // 初回の特殊モード移行時のみ演出を実行
-                if (currentMode === "normal" && nextMode === "special") {
-                    currentMode = "special";
-                    if (isFirstSpecial) {
-                        isFirstSpecial = false;
-                        triggerSpecialSequence(list);
+                // 緊急モードへの移行
+                if (nextMode === "special") {
+                    if (currentMode === "normal") {
+                        currentMode = "special";
+                        if (isFirstSpecial) {
+                            isFirstSpecial = false;
+                            triggerSpecialSequence(list);
+                        } else {
+                            document.body.classList.add('special-mode');
+                            showSpecialList(list);
+                        }
                     } else {
-                        // 2回目以降（またはリセットなしの再入室など）は即表示
+                        // 緊急モード中の更新
                         document.body.classList.add('special-mode');
                         showSpecialList(list);
                     }
                     return;
                 }
 
-                // 特殊モード継続中（4文字目以降）
-                if (nextMode === "special") {
-                    document.body.classList.add('special-mode');
-                    showSpecialList(list);
-                    return;
-                }
-
                 // 通常モード
                 if (nextMode === "normal") {
                     currentMode = "normal";
-                    isFirstSpecial = true; // リセット時にフラグを戻す
+                    isFirstSpecial = true;
                     document.body.classList.remove('special-mode');
                     outputElement.classList.remove('corrupting');
                     shutdownLine.style.display = "none";
@@ -203,7 +211,10 @@
                     } else if (list.length === 2) {
                         typeWriter("キーワードを2つ受信しました。\n残り1つです。");
                     } else {
-                        typeWriter("必要なキーワードをすべて送ってください。\n\n" + [...list].reverse().join("\n"));
+                        // 3つ揃った場合：指定文言 ＋ シャッフル
+                        const shuffled = shuffle(list);
+                        const finalContent = "解析が完了しました。回答を表示します：\n\n" + shuffled.join("  ");
+                        typeWriter(finalContent);
                     }
                 }
             });
