@@ -47,39 +47,40 @@
             "green": "【生命の断片】: 温室の3番目の鉢植えを調べよ。"
         };
 
-        document.getElementById('sendBtn').onclick = async () => {
-            const password = document.getElementById('pass').value.toLowerCase().trim();
-            
-            if (messageMaster[password]) {
-                const targetMessage = messageMaster[password];
-                const messagesRef = ref(db, 'mystery/messages');
+       document.getElementById('sendBtn').onclick = async () => {
+    const password = document.getElementById('pass').value.toLowerCase().trim();
+    
+    if (messageMaster[password]) {
+        const targetMessage = messageMaster[password];
+        const messagesRef = ref(db, 'mystery/messages');
 
-                try {
-                    // 現在のメッセージリストを読み取る
-                    const snapshot = await get(messagesRef);
-                    let currentList = snapshot.val() || [];
+        try {
+            const snapshot = await get(messagesRef);
+            let currentList = snapshot.val() || [];
 
-                    // もし既に3つ揃ってリセットされていた後の最初の入力なら、空にする
-                    if (currentList.length >= 3) {
-                        currentList = [];
-                    }
-
-                    // リストに今回のメッセージを追加
-                    currentList.push(targetMessage);
-
-                    // Firebaseに更新したリストを書き込む
-                    await set(messagesRef, currentList);
-
-                    alert("キーワードを送信しました！モニターの反応を確認してください。");
-                    document.getElementById('pass').value = ""; // 入力欄をリセット
-                } catch (error) {
-                    console.error("エラーが発生しました:", error);
-                    alert("送信に失敗しました。通信環境を確認してください。");
-                }
-            } else {
-                alert("そのキーワードは正しくありません。");
+            // ★ここがポイント：既に3つ揃っていたら、リストを空にしてから追加する
+            if (currentList.length >= 3) {
+                currentList = []; 
             }
-        };
+
+            // 二重投稿防止（同じキーワードが既にリストにあれば弾く場合）
+            if (currentList.includes(targetMessage)) {
+                alert("そのキーワードは既に送信済みです！");
+                return;
+            }
+
+            currentList.push(targetMessage);
+            await set(messagesRef, currentList);
+
+            alert("キーワードを送信しました！");
+            document.getElementById('pass').value = ""; 
+        } catch (error) {
+            alert("送信エラー。");
+        }
+    } else {
+        alert("キーワードが正しくありません。");
+    }
+};
     </script>
 </body>
 </html>
