@@ -27,6 +27,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
         import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
 
+        // Firebase設定
         const firebaseConfig = {
             apiKey: "AIzaSyDj3T3b4fdLD83kC_RAp2Wg5cFw7VE_x0s",
             authDomain: "realtime-database-c26e9.firebaseapp.com",
@@ -58,17 +59,30 @@
             document.getElementById('loading').classList.add('hidden');
 
             if (!snapshot.exists() || (now - snapshot.val().timestamp > EXPIRE_TIME)) {
-                // 未登録または期限切れ
+                // 【ケース1】未登録、または3時間以上経過（リセット）
                 document.getElementById('reg-view').classList.remove('hidden');
                 document.getElementById('regBtn').onclick = async () => {
                     const name = document.getElementById('playerName').value.trim();
                     if (!name) return alert("名前を入力してください");
-                    await set(tagRef, { ownerId: myId, playerName: name, timestamp: now });
+                    
+                    await set(tagRef, { 
+                        ownerId: myId, 
+                        playerName: name, 
+                        timestamp: now 
+                    });
+                    // 登録直後は本人なので player.html へ
                     window.location.href = `player.html?id=${tagId}`;
                 };
             } else {
-                // 登録済み：本人か他人か
-                window.location.href = `player.html?id=${tagId}`;
+                // 【ケース2】登録済み：本人か他人か判定
+                const data = snapshot.val();
+                if (data.ownerId === myId) {
+                    // 本人の場合
+                    window.location.href = `player.html?id=${tagId}`;
+                } else {
+                    // 他人の場合（ここが playerQ.html へ飛ぶ新ロジック）
+                    window.location.href = `playerQ.html?id=${tagId}`;
+                }
             }
         }
         init();
