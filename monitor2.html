@@ -99,7 +99,7 @@ onValue(messagesRef, (snapshot) => {
     } else if (count >= 3) {
         // 3つ揃った！
         const shuffled = shuffle([...list]);
-        const finalContent = "全てのキーワードが揃いました。\n\n" + shuffled.join("\n");
+        const finalContent = "必要なキーワードをすべて送ってください。"\n\n" + shuffled.join("\n");
         typeWriter(finalContent);
     }
 });
