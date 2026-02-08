@@ -43,6 +43,9 @@
             "えんとつ": "て", "つみき": "あ", "きつつき": "り"
         };
 
+        // 入力履歴を保持する変数
+        let inputHistory = [];
+
         async function init() {
             const tagSnapshot = await get(ref(db, `tags/${tagId}`));
             const data = tagSnapshot.val();
@@ -60,20 +63,38 @@
             document.getElementById('sendBtn').onclick = async () => {
                 const val = document.getElementById('ansInput').value.trim();
                 const result = messageMaster[val];
+                
                 if (result) {
                     const msgRef = ref(db, 'mystery/messages');
+                    const modeRef = ref(db, 'mystery/mode');
+                    
+                    // --- 特殊モード判定：履歴をチェック ---
+                    inputHistory.push(val);
+                    if (inputHistory.length > 3) inputHistory.shift(); // 直近3つのみ保持
+
+                    const secretCombo = ["くさり", "りんご", "ごりら"];
+                    const isCombo = secretCombo.every((v, i) => v === inputHistory[i]);
+
+                    if (isCombo) {
+                        await set(modeRef, "special");
+                        alert("【警告】システムが特殊モードに移行しました！");
+                    }
+                    // ------------------------------------
+
                     const snap = await get(msgRef);
                     let list = snap.val() || [];
                     
-                    // 特殊モード(9個一気に表示)でない限り、3つでリセットする仕様を維持
-                    // ※モニター側の仕様に合わせて調整してください
-                    if (list.length >= 3) {
-                        const modeSnap = await get(ref(db, 'mystery/mode'));
-                        if (modeSnap.val() !== "special") list = [];
+                    const modeSnap = await get(modeRef);
+                    const isSpecial = modeSnap.val() === "special";
+
+                    // 通常モード（かつ3つ以上溜まっている）ならリストをリセット
+                    if (!isSpecial && list.length >= 3) {
+                        list = [];
                     }
                     
                     list.push(result);
                     await set(msgRef, list);
+                    
                     alert(`「${val}」を送信しました。`);
                     document.getElementById('ansInput').value = "";
                 } else {
@@ -85,6 +106,7 @@
                 if(confirm("全消去しますか？")){
                     await set(ref(db, 'mystery/messages'), null);
                     await set(ref(db, 'mystery/mode'), "normal");
+                    inputHistory = []; // 履歴もクリア
                     alert("リセット完了");
                 }
             };
