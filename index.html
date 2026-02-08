@@ -3,29 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>認証・登録システム</title>
+    <title>登録システム</title>
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #f4f4f9; }
-        .container { max-width: 400px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        body { font-family: sans-serif; text-align: center; padding: 20px; background: #f0f2f5; }
+        .card { max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        input { padding: 12px; width: 100%; box-sizing: border-box; margin: 15px 0; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
+        button { padding: 12px; width: 100%; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
         .hidden { display: none; }
-        input { padding: 12px; margin: 15px 0; width: 100%; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
-        button { padding: 12px 24px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; width: 100%; }
-        button:hover { background: #218838; }
-        #loading { color: #666; margin-top: 50px; }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="card">
         <div id="loading">確認中...</div>
-
         <div id="reg-view" class="hidden">
             <h2>プレイヤー登録</h2>
-            <p>使用する名前を入力してください</p>
-            <input type="text" id="playerName" placeholder="例：プレイヤー1">
+            <p>名前を<strong>「ひらがな」</strong>で入力してください</p>
+            <input type="text" id="playerName" placeholder="たなか">
             <button id="regBtn">登録して開始</button>
-            <p style="font-size: 0.8rem; color: #888; margin-top: 20px;">
-                ※登録から3時間経過すると自動的にリセットされます。
-            </p>
         </div>
     </div>
 
@@ -33,7 +27,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
         import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
 
-        // --- Firebase設定 ---
         const firebaseConfig = {
             apiKey: "AIzaSyDj3T3b4fdLD83kC_RAp2Wg5cFw7VE_x0s",
             authDomain: "realtime-database-c26e9.firebaseapp.com",
@@ -47,71 +40,38 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // --- 端末識別 (LocalStorage) ---
-        let myId = localStorage.getItem('mystery_user_id');
-        if (!myId) {
-            myId = 'user_' + Math.random().toString(36).substr(2, 9);
-            localStorage.setItem('mystery_user_id', myId);
-        }
+        // 端末ID管理
+        let myId = localStorage.getItem('mystery_user_id') || ('user_' + Math.random().toString(36).substr(2, 9));
+        localStorage.setItem('mystery_user_id', myId);
 
-        // URLパラメータの取得 (?id=tag1 など)
         const params = new URLSearchParams(window.location.search);
         const tagId = params.get('id');
 
         async function init() {
-            if (!tagId) {
-                document.getElementById('loading').innerText = "エラー：NFCタグからアクセスしてください。";
-                return;
-            }
+            if (!tagId) { document.body.innerText = "タグIDがありません"; return; }
 
             const tagRef = ref(db, `tags/${tagId}`);
             const snapshot = await get(tagRef);
-            const now = Date.now(); // 現在時刻
+            const now = Date.now();
+            const EXPIRE_TIME = 3 * 60 * 60 * 1000;
 
             document.getElementById('loading').classList.add('hidden');
 
-            // 3時間経過リセット判定（3時間 = 10,800,000ミリ秒）
-            const EXPIRE_TIME = 3 * 60 * 60 * 1000;
-            let isExpired = false;
-            if (snapshot.exists()) {
-                const data = snapshot.val();
-                if (now - data.timestamp > EXPIRE_TIME) {
-                    isExpired = true;
-                }
-            }
-
-            if (!snapshot.exists() || isExpired) {
-                // 【未登録】または【期限切れ】
+            if (!snapshot.exists() || (now - snapshot.val().timestamp > EXPIRE_TIME)) {
+                // 未登録または期限切れ
                 document.getElementById('reg-view').classList.remove('hidden');
                 document.getElementById('regBtn').onclick = async () => {
-                    const name = document.getElementById('playerName').value;
+                    const name = document.getElementById('playerName').value.trim();
                     if (!name) return alert("名前を入力してください");
-                    
-                    // 登録時刻（timestamp）を含めて保存
-                    await set(tagRef, { 
-                        ownerId: myId, 
-                        playerName: name, 
-                        timestamp: now 
-                    });
+                    await set(tagRef, { ownerId: myId, playerName: name, timestamp: now });
                     window.location.href = `player.html?id=${tagId}`;
                 };
             } else {
-                // 【登録済み】かつ【期限内】
-                const data = snapshot.val();
-                if (data.ownerId === myId) {
-                    // 本人
-                    window.location.href = `player.html?id=${tagId}`;
-                } else {
-                    // 他人
-                    window.location.href = `player1.html?id=${tagId}`;
-                }
+                // 登録済み：本人か他人か
+                window.location.href = `player.html?id=${tagId}`;
             }
         }
-
-        init().catch(err => {
-            console.error(err);
-            document.getElementById('loading').innerText = "接続エラー。ルール設定を確認してください。";
-        });
+        init();
     </script>
 </body>
 </html>
