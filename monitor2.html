@@ -50,18 +50,12 @@
             z-index: 100;
         }
 
-        /* 砂嵐の制御 */
         .show-noise { opacity: 0.5 !important; }
         .full-noise { opacity: 1.0 !important; }
 
         /* --- 特殊モード（起動後） --- */
-        body.special-mode {
-            background: #000;
-            color: #f00; /* 赤文字 */
-        }
-        body.special-mode #output {
-            text-shadow: 0 0 15px #f00; /* 視認性のためノイズは消すが、発光は強める */
-        }
+        body.special-mode { background: #000; color: #f00; }
+        body.special-mode #output { text-shadow: 0 0 15px #f00; }
 
         /* --- シャットダウン演出用：画面が閉じる線 --- */
         #shutdown-line {
@@ -71,6 +65,7 @@
             transform: scaleX(0);
             z-index: 101;
             display: none;
+            transition: transform 0.2s;
         }
 
         #output::after { content: "|"; animation: blink 1s infinite; }
@@ -104,6 +99,7 @@
         const shutdownLine = document.getElementById('shutdown-line');
         let typeTimer = null;
         let currentMode = "normal";
+        let isFirstSpecial = true; // 初回演出フラグ
 
         function typeWriter(text, speed = 70) {
             if (typeTimer) clearInterval(typeTimer);
@@ -119,52 +115,51 @@
             }, speed); 
         }
 
-        // 文字化け生成関数
         function getGarbageText(length) {
             const chars = "ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ@#$%&*?<>∑Ω≈";
             return Array.from({length}, () => chars[Math.floor(Math.random()*chars.length)]).join("");
         }
 
+        // 豪華演出シーケンス
         async function triggerSpecialSequence(list) {
-            // 1. 文字化け開始
             outputElement.classList.add('corrupting');
             let count = 0;
             const corruptInterval = setInterval(() => {
                 outputElement.innerText = getGarbageText(50);
                 if (count++ > 20) {
                     clearInterval(corruptInterval);
-                    // 2. ノイズ発生
                     noiseScreen.classList.add('show-noise');
                     setTimeout(shutdown, 500);
                 }
             }, 100);
 
             function shutdown() {
-                // 3. シャットダウン
                 noiseScreen.classList.remove('show-noise');
                 outputElement.innerText = "";
                 shutdownLine.style.display = "block";
-                shutdownLine.style.transform = "scaleX(1)";
+                setTimeout(() => { shutdownLine.style.transform = "scaleX(1)"; }, 10);
                 setTimeout(() => {
                     shutdownLine.style.transform = "scaleX(0)";
-                    // 4. ブラックアウト（静寂）
                     setTimeout(reboot, 1500);
                 }, 200);
             }
 
             function reboot() {
-                // 5. 再起動ノイズ
                 noiseScreen.classList.add('full-noise');
                 setTimeout(() => {
-                    // 6. 完了：赤文字モードへ
                     noiseScreen.classList.remove('full-noise');
                     document.body.classList.add('special-mode');
-                    const specialContent = "【緊急読込モード発動】\n全解析データを同期しました：\n\n" + list.join(" ");
-                    typeWriter(specialContent, 30);
+                    showSpecialList(list);
                 }, 800);
             }
         }
 
+        function showSpecialList(list) {
+            const specialContent = "【緊急読込モード発動】\n全解析データを同期しました：\n\n" + list.join(" ");
+            typeWriter(specialContent, 30);
+        }
+
+        // メインロジック
         onValue(ref(db, 'mystery/mode'), (modeSnap) => {
             const nextMode = modeSnap.val();
             const messagesRef = ref(db, 'mystery/messages');
@@ -172,16 +167,35 @@
             onValue(messagesRef, (msgSnap) => {
                 const list = msgSnap.val() || [];
                 
+                // 初回の特殊モード移行時のみ演出を実行
                 if (currentMode === "normal" && nextMode === "special") {
                     currentMode = "special";
-                    triggerSpecialSequence(list);
+                    if (isFirstSpecial) {
+                        isFirstSpecial = false;
+                        triggerSpecialSequence(list);
+                    } else {
+                        // 2回目以降（またはリセットなしの再入室など）は即表示
+                        document.body.classList.add('special-mode');
+                        showSpecialList(list);
+                    }
                     return;
                 }
 
+                // 特殊モード継続中（4文字目以降）
+                if (nextMode === "special") {
+                    document.body.classList.add('special-mode');
+                    showSpecialList(list);
+                    return;
+                }
+
+                // 通常モード
                 if (nextMode === "normal") {
                     currentMode = "normal";
+                    isFirstSpecial = true; // リセット時にフラグを戻す
                     document.body.classList.remove('special-mode');
                     outputElement.classList.remove('corrupting');
+                    shutdownLine.style.display = "none";
+                    
                     if (list.length === 0) {
                         typeWriter("システム待機中...\nキーワードを入力してください。");
                     } else if (list.length === 1) {
@@ -192,7 +206,7 @@
                         typeWriter("必要なキーワードをすべて送ってください。\n\n" + [...list].reverse().join("\n"));
                     }
                 }
-            }, { onlyOnce: (currentMode === "special") });
+            });
         });
     </script>
 </body>
