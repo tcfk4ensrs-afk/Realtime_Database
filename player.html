@@ -7,7 +7,10 @@
     <style>
         body { font-family: sans-serif; text-align: center; padding: 20px; background: #eef2f3; }
         .box { max-width: 450px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        button { padding: 12px 20px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer; width: 100%; font-size: 16px; }
+        input { padding: 12px; width: 85%; margin: 15px 0; border-radius: 5px; border: 1px solid #ccc; font-size: 16px; }
+        button { padding: 12px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; width: 90%; font-size: 16px; margin-bottom: 10px; }
+        .danger-btn { background: #dc3545; margin-top: 30px; font-size: 14px; opacity: 0.8; }
+        hr { margin: 25px 0; border: 0; border-top: 1px solid #eee; }
     </style>
 </head>
 <body>
@@ -33,27 +36,56 @@
         const params = new URLSearchParams(window.location.search);
         const tagId = params.get('id');
 
+        // 9組のマスターデータ
+        const messageMaster = {
+            "くさり": "た", "りんご": "す", "ごりら": "け",
+            "らっぱ": "て", "ぱんつ": "く", "つくえ": "れ",
+            "えんとつ": "て", "つみき": "あ", "きつつき": "り"
+        };
+
         async function init() {
             const tagSnapshot = await get(ref(db, `tags/${tagId}`));
             const data = tagSnapshot.val();
-
-            if (!data) {
-                document.getElementById('main-content').innerText = "データが見つかりません。";
-                return;
-            }
+            if (!data) return;
 
             document.getElementById('main-content').innerHTML = `
-                <h2>自分のタグ：${data.playerName}</h2>
-                <p>このタグはあなたの名前で登録されています。<br>他人が読み込むと暗号が表示されます。</p>
+                <h3>管理者：${data.playerName} さん</h3>
+                <p>回答を入力してモニターに送る</p>
+                <input type="text" id="ansInput" placeholder="答えを入力">
+                <button id="sendBtn">送信</button>
                 <hr>
-                <button id="resetBtn">モニター表示をリセット</button>
+                <button class="danger-btn" id="resetBtn">モニターリセット</button>
             `;
 
+            document.getElementById('sendBtn').onclick = async () => {
+                const val = document.getElementById('ansInput').value.trim();
+                const result = messageMaster[val];
+                if (result) {
+                    const msgRef = ref(db, 'mystery/messages');
+                    const snap = await get(msgRef);
+                    let list = snap.val() || [];
+                    
+                    // 特殊モード(9個一気に表示)でない限り、3つでリセットする仕様を維持
+                    // ※モニター側の仕様に合わせて調整してください
+                    if (list.length >= 3) {
+                        const modeSnap = await get(ref(db, 'mystery/mode'));
+                        if (modeSnap.val() !== "special") list = [];
+                    }
+                    
+                    list.push(result);
+                    await set(msgRef, list);
+                    alert(`「${result}」を送信しました。`);
+                    document.getElementById('ansInput').value = "";
+                } else {
+                    alert("キーワードが違います。");
+                }
+            };
+
             document.getElementById('resetBtn').onclick = async () => {
-                if(confirm("モニターの情報をリセットしますか？")){
+                if(confirm("全消去しますか？")){
                     await set(ref(db, 'mystery/messages'), null);
                     await set(ref(db, 'mystery/mode'), "normal");
-                    alert("リセットしました");
+                    alert("リセット完了");
                 }
             };
         }
