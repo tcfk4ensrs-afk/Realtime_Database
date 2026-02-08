@@ -49,23 +49,37 @@
 
        document.getElementById('sendBtn').onclick = async () => {
     const password = document.getElementById('pass').value.toLowerCase().trim();
-    
+    const messagesRef = ref(db, 'mystery/messages');
+
+    // --- 「リセット」と入力された場合の処理 ---
+    if (password === "リセット" || password === "reset") {
+        if (confirm("全てのキーワードをリセットして初期状態に戻しますか？")) {
+            await set(messagesRef, null); // データを空にする
+            alert("システムをリセットしました。");
+            document.getElementById('pass').value = "";
+        }
+        return; // 処理終了
+    }
+
+    // --- 通常のパスワード判定 ---
     if (messageMaster[password]) {
         const targetMessage = messageMaster[password];
-        const messagesRef = ref(db, 'mystery/messages');
-
         try {
             const snapshot = await get(messagesRef);
             let currentList = snapshot.val() || [];
 
-            // ★ここがポイント：既に3つ揃っていたら、リストを空にしてから追加する
+            // 既に3つある場合は、リセットを促すか自動で空にする
             if (currentList.length >= 3) {
-                currentList = []; 
+                if(confirm("既に3つ揃っています。リセットして新しく登録しますか？")) {
+                    currentList = [];
+                } else {
+                    return;
+                }
             }
 
-            // 二重投稿防止（同じキーワードが既にリストにあれば弾く場合）
+            // 二重投稿防止
             if (currentList.includes(targetMessage)) {
-                alert("そのキーワードは既に送信済みです！");
+                alert("そのキーワードは既に送信済みです。");
                 return;
             }
 
@@ -73,9 +87,9 @@
             await set(messagesRef, currentList);
 
             alert("キーワードを送信しました！");
-            document.getElementById('pass').value = ""; 
+            document.getElementById('pass').value = "";
         } catch (error) {
-            alert("送信エラー。");
+            alert("送信に失敗しました。");
         }
     } else {
         alert("キーワードが正しくありません。");
