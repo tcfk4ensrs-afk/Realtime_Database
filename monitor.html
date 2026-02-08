@@ -2,9 +2,35 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { background: #000; color: #0f0; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: 'Courier New', monospace; }
-        #output { font-size: 5vw; text-shadow: 0 0 10px #0f0; }
+        body { 
+            background: #000; 
+            color: #0f0; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            margin: 0;
+            font-family: 'Courier New', monospace; 
+            overflow: hidden;
+        }
+        #output { 
+            font-size: 4vw; 
+            text-shadow: 0 0 10px #0f0; 
+            width: 80%;
+            line-height: 1.5;
+            text-align: center;
+        }
+        /* カーソルの点滅演出 */
+        #output::after {
+            content: "|";
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
     </style>
 </head>
 <body>
@@ -27,12 +53,33 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // 'mystery/displayText' を監視して、変わったら画面を書き換える
+        const outputElement = document.getElementById('output');
+        let typeTimer = null;
+
+        // 文字を1文字ずつ表示する関数
+        function typeWriter(text) {
+            // 前のタイマーが動いていたら止める
+            if (typeTimer) clearInterval(typeTimer);
+            
+            outputElement.innerText = "";
+            let i = 0;
+            
+            typeTimer = setInterval(() => {
+                if (i < text.length) {
+                    outputElement.innerText += text.charAt(i);
+                    i++;
+                } else {
+                    clearInterval(typeTimer);
+                }
+            }, 100); // 100ms ごとに1文字表示
+        }
+
         const displayRef = ref(db, 'mystery/displayText');
         onValue(displayRef, (snapshot) => {
             const val = snapshot.val();
             if (val) {
-                document.getElementById('output').innerText = val;
+                // 演出付きで表示
+                typeWriter(val);
             }
         });
     </script>
