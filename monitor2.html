@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { 
+            background: #000; 
+            color: #0f0; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            margin: 0;
+            font-family: 'Courier New', monospace; 
+            overflow: hidden;
+        }
+        #output { 
+            font-size: 3.5vw; 
+            text-shadow: 0 0 10px #0f0; 
+            width: 85%;
+            line-height: 1.8;
+            text-align: center;
+            white-space: pre-wrap; /* 改行を有効にする */
+        }
+        #output::after {
+            content: "|";
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div id="output">システム待機中...</div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+        import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDj3T3b4fdLD83kC_RAp2Wg5cFw7VE_x0s",
+            authDomain: "realtime-database-c26e9.firebaseapp.com",
+            projectId: "realtime-database-c26e9",
+            storageBucket: "realtime-database-c26e9.firebasestorage.app",
+            messagingSenderId: "397939201496",
+            appId: "1:397939201496:web:3b651c82fdbda090ee4ead",
+            databaseURL: "https://realtime-database-c26e9-default-rtdb.asia-southeast1.firebasedatabase.app"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        const outputElement = document.getElementById('output');
+        let typeTimer = null;
+
+        // タイピング演出関数
+        function typeWriter(text) {
+            if (typeTimer) clearInterval(typeTimer);
+            outputElement.innerText = "";
+            let i = 0;
+            typeTimer = setInterval(() => {
+                if (i < text.length) {
+                    outputElement.innerText += text.charAt(i);
+                    i++;
+                } else {
+                    clearInterval(typeTimer);
+                }
+            }, 70); 
+        }
+
+        // 配列をシャッフルする関数（フィッシャー–イェーツのシャッフル）
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // 'mystery/messages'（溜まっているメッセージのリスト）を監視
+        const messagesRef = ref(db, 'mystery/messages');
+        onValue(messagesRef, (snapshot) => {
+            const list = snapshot.val() || [];
+            const count = list.length;
+
+            if (count === 0) {
+                typeWriter("システム待機中...\nキーワードを入力してください。");
+            } else if (count === 1) {
+                typeWriter("キーワードを1つ受信しました。\n残り2つです。");
+            } else if (count === 2) {
+                typeWriter("キーワードを2つ受信しました。\n残り1つです。");
+            } else if (count >= 3) {
+                // 3つ揃った！ランダムに並び替えて表示
+                const shuffled = shuffle([...list]);
+                const finalContent = "全てのキーワードが揃いました。\n\n" + shuffled.join("\n");
+                typeWriter(finalContent);
+                
+                // 5秒後にリストをリセットしたい場合は以下を有効にします
+                // setTimeout(() => { set(messagesRef, null); }, 30000);
+            }
+        });
+    </script>
+</body>
+</html>
