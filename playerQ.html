@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>問題：暗号解読</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; background: #2c3e50; color: white; }
+        .card { max-width: 450px; margin: 30px auto; background: #fff; color: #333; padding: 30px; border-radius: 15px; box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
+        .cipher-box { background: #f8f9fa; border: 2px dashed #333; padding: 20px; font-size: 1.8rem; letter-spacing: 3px; margin: 20px 0; font-weight: bold; }
+        input { padding: 12px; width: 80%; margin: 15px 0; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
+        button { padding: 12px 30px; background: #e74c3c; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        .hint { font-size: 0.8rem; color: #7f8c8d; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>MISSION：暗号を解け</h2>
+        <p id="owner-msg">スキャン中...</p>
+        
+        <div class="cipher-box" id="cipher-display">----</div>
+        
+        <p class="hint">法則：A=1, B=2, C=3 ... Z=26</p>
+        
+        <input type="text" id="ansInput" placeholder="答えを入力">
+        <br>
+        <button id="sendBtn">送信する</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+        import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
+
+        const firebaseConfig = { /* あなたのFirebase設定をここに貼る */ };
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        const params = new URLSearchParams(window.location.search);
+        const tagId = params.get('id');
+
+        // ひらがな -> ローマ字変換 (ヘボン式をベースに拡張可能)
+        const kanaMap = {
+            'あ':'A','い':'I','う':'U','え':'E','お':'O','か':'KA','き':'KI','く':'KU','け':'KE','こ':'KO',
+            'さ':'SA','し':'SHI','す':'SU','せ':'SE','そ':'SO','た':'TA','ち':'CHI','つ':'TSU','て':'TE','と':'TO',
+            'な':'NA','に':'NI','ぬ':'NU','ね':'NE','の':'NO','は':'HA','ひ':'HI','ふ':'FU','へ':'HE','ほ':'HO',
+            'ま':'MA','み':'MI','む':'MU','め':'ME','も':'MO','や':'YA','ゆ':'YU','よ':'YO','ら':'RA','り':'RI',
+            'る':'RU','れ':'RE','ろ':'RO','わ':'WA','を':'WO','ん':'N'
+        };
+
+        // 名前を数字の暗号に変える関数
+        function generateCipher(name) {
+            let roman = "";
+            for (let char of name) {
+                roman += kanaMap[char] || "";
+            }
+            // アルファベットを A=1, B=2... に変換
+            return roman.split('').map(c => {
+                const code = c.toUpperCase().charCodeAt(0);
+                return (code >= 65 && code <= 90) ? (code - 64) : "";
+            }).filter(n => n !== "").join(", ");
+        }
+
+        async function loadQuiz() {
+            const tagSnapshot = await get(ref(db, `tags/${tagId}`));
+            if (!tagSnapshot.exists()) return;
+
+            const data = tagSnapshot.val();
+            document.getElementById('owner-msg').innerText = `対象者：${data.playerName}`;
+            document.getElementById('cipher-display').innerText = generateCipher(data.playerName);
+        }
+
+        document.getElementById('sendBtn').onclick = async () => {
+            const val = document.getElementById('ansInput').value.trim();
+            const msgRef = ref(db, 'mystery/messages');
+            
+            // --- 正解判定とモニター送信 ---
+            // ※ここにしりとり用の正解と、モニターに出る文字のペアを書く
+            const messageMaster = {
+                "あした": "た",
+                "くさり": "な",
+                "りんご": "す"
+            };
+
+            if (messageMaster[val]) {
+                const snap = await get(msgRef);
+                let list = snap.val() || [];
+                if (list.length >= 3) list = []; // 3つ溜まってたらリセット
+                
+                list.push(messageMaster[val]);
+                await set(msgRef, list);
+                alert("送信に成功しました！モニターを確認してください。");
+                document.getElementById('ansInput').value = "";
+            } else {
+                alert("不正解！暗号をもう一度見直してください。");
+            }
+        };
+
+        loadQuiz();
+    </script>
+</body>
+</html>
