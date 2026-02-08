@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>問題パネル</title>
+    <title>解析ミッション</title>
     <style>
         body { font-family: sans-serif; text-align: center; padding: 20px; background: #eef2f3; }
         .box { max-width: 450px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .cipher-container { background: #eee; padding: 15px; border: 2px dashed #333; margin: 15px 0; }
-        .cipher { font-size: 1.6rem; letter-spacing: 2px; font-weight: bold; margin-bottom: 10px; }
-        .hint-text { font-size: 0.9rem; color: #d9534f; font-weight: bold; border-top: 1px solid #ccc; pt: 10px; margin-top: 10px; display: block; }
-        input { padding: 12px; width: 80%; margin: 10px 0; border-radius: 5px; border: 1px solid #ccc; font-size: 16px; }
-        button { padding: 12px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        .cipher { font-size: 1.6rem; letter-spacing: 2px; font-weight: bold; margin-bottom: 10px; color: #333; }
+        .hint-text { font-size: 0.9rem; color: #d9534f; font-weight: bold; border-top: 1px solid #ccc; padding-top: 10px; margin-top: 10px; display: block; }
+        .instruction { font-size: 1rem; color: #555; margin-top: 20px; line-height: 1.6; }
+        .target-name { font-size: 1.2rem; color: #007bff; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -19,8 +19,9 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-        import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
+        import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
 
+        // Firebase設定
         const firebaseConfig = {
             apiKey: "AIzaSyDj3T3b4fdLD83kC_RAp2Wg5cFw7VE_x0s",
             authDomain: "realtime-database-c26e9.firebaseapp.com",
@@ -37,33 +38,25 @@
         const params = new URLSearchParams(window.location.search);
         const tagId = params.get('id');
 
-       const kanaMap = {
-    // 基本五 builder
-    'あ':'A','い':'I','う':'U','え':'E','お':'O',
-    'か':'KA','き':'KI','く':'KU','け':'KE','こ':'KO',
-    'さ':'SA','し':'SHI','す':'SU','せ':'SE','そ':'SO',
-    'た':'TA','ち':'CHI','つ':'TSU','て':'TE','と':'TO',
-    'な':'NA','に':'NI','ぬ':'NU','ね':'NE','の':'NO',
-    'は':'HA','ひ':'HI','ふ':'FU','へ':'HE','ほ':'HO',
-    'ま':'MA','み':'MI','む':'MU','め':'ME','も':'MO',
-    'や':'YA','ゆ':'YU','よ':'YO',
-    'ら':'RA','り':'RI','る':'RU','れ':'RE','ろ':'RO',
-    'わ':'WA','を':'WO','ん':'N',
-    // 濁音（だくてん）
-    'が':'GA','ぎ':'GI','ぐ':'GU','げ':'GE','ご':'GO',
-    'ざ':'ZA','じ':'JI','ず':'ZU','ぜ':'ZE','ぞ':'ZO',
-    'だ':'DA','ぢ':'JI','づ':'ZU','で':'DE','ど':'DO',
-    'ば':'BA','び':'BI','ぶ':'BU','べ':'BE','ぼ':'BO',
-    // 半濁音
-    'ぱ':'PA','ぴ':'PI','ぷ':'PU','ぺ':'PE','ぽ':'PO',
-    // 拗音（小さい文字）※簡易変換のため、ひらがな一文字ずつ対応
-    'ぁ':'A','ぃ':'I','ぅ':'U','ぇ':'E','ぉ':'O',
-    'っ':'','ゃ':'YA','ゅ':'YU','ょ':'YO',
-    'ゎ':'WA'
-};
-
-        const messageMaster = {
-            "あした": "ら"
+        // ローマ字変換マップ
+        const kanaMap = {
+            'あ':'A','い':'I','う':'U','え':'E','お':'O',
+            'か':'KA','き':'KI','く':'KU','け':'KE','こ':'KO',
+            'さ':'SA','し':'SHI','す':'SU','せ':'SE','そ':'SO',
+            'た':'TA','ち':'CHI','つ':'TSU','て':'TE','と':'TO',
+            'な':'NA','に':'NI','ぬ':'NU','ね':'NE','の':'NO',
+            'は':'HA','ひ':'HI','ふ':'FU','へ':'HE','ほ':'HO',
+            'ま':'MA','み':'MI','む':'MU','め':'ME','も':'MO',
+            'や':'YA','ゆ':'YU','よ':'YO',
+            'ら':'RA','り':'RI','る':'RU','れ':'RE','ろ':'RO',
+            'わ':'WA','を':'WO','ん':'N',
+            'が':'GA','ぎ':'GI','ぐ':'GU','げ':'GE','ご':'GO',
+            'ざ':'ZA','じ':'JI','ず':'ZU','ぜ':'ZE','ぞ':'ZO',
+            'だ':'DA','ぢ':'JI','づ':'ZU','で':'DE','ど':'DO',
+            'ば':'BA','び':'BI','ぶ':'BU','べ':'BE','ぼ':'BO',
+            'ぱ':'PA','ぴ':'PI','ぷ':'PU','ぺ':'PE','ぽ':'PO',
+            'ぁ':'A','ぃ':'I','ぅ':'U','ぇ':'E','ぉ':'O',
+            'っ':'','ゃ':'YA','ゅ':'YU','ょ':'YO','ゎ':'WA'
         };
 
         function toCipher(name) {
@@ -73,46 +66,33 @@
         }
 
         async function init() {
+            if (!tagId) {
+                document.getElementById('main-content').innerText = "タグ情報が読み込めません。";
+                return;
+            }
+
             const tagSnapshot = await get(ref(db, `tags/${tagId}`));
             const data = tagSnapshot.val();
-            if (!data) return;
+            
+            if (!data) {
+                document.getElementById('main-content').innerText = "このタグにはまだ誰も登録していません。";
+                return;
+            }
 
             const cipherText = toCipher(data.playerName);
             document.getElementById('main-content').innerHTML = `
                 <h2>解析ミッション</h2>
-                <p>所有者：<strong>${data.playerName}</strong></p>
+                <p>このタグの所有者：<br><span class="target-name">${data.playerName}</span></p>
                 
                 <div class="cipher-container">
                     <div class="cipher">${cipherText}</div>
                     <span class="hint-text">答え＝1  19,8,9 20,1</span>
                 </div>
 
-                <input type="text" id="ansInput" placeholder="答えを入力">
-                <br>
-                <button id="sendBtn">送信</button>
+                <div class="instruction">
+                    <p>この暗号を解き、導き出されたキーワードを<br><strong>所有者（${data.playerName}さん）</strong>の端末に<br>入力してもらってください。</p>
+                </div>
             `;
-            document.getElementById('sendBtn').onclick = () => handleInput(document.getElementById('ansInput').value);
-        }
-
-        async function handleInput(val) {
-            const result = messageMaster[val.trim()];
-            if (result) {
-                const msgRef = ref(db, 'mystery/messages');
-                const snap = await get(msgRef);
-                let list = snap.val() || [];
-                
-                if (list.length >= 3) {
-                    const modeSnap = await get(ref(db, 'mystery/mode'));
-                    if (modeSnap.val() !== "special") list = [];
-                }
-                
-                list.push(result);
-                await set(msgRef, list);
-                alert(`「${val}」を送信しました！モニターを確認してください。`);
-                document.getElementById('ansInput').value = "";
-            } else {
-                alert("キーワードが正しくありません。");
-            }
         }
         init();
     </script>
