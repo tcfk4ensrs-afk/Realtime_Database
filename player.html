@@ -2,12 +2,13 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>プレイヤー操作パネル</title>
 </head>
 <body>
     <h1>謎解き入力</h1>
-    <input type="text" id="pass" placeholder="パスワードを入力">
-    <input type="text" id="msg" placeholder="表示するメッセージ">
+    <p>ヒント：正しいキーワードを入力して送信してください。</p>
+    <input type="text" id="pass" placeholder="キーワードを入力">
     <button id="sendBtn">送信する</button>
 
     <script type="module">
@@ -21,23 +22,30 @@
             storageBucket: "realtime-database-c26e9.firebasestorage.app",
             messagingSenderId: "397939201496",
             appId: "1:397939201496:web:3b651c82fdbda090ee4ead",
-            // ⚠️ もしdatabaseURLがあればここに追加してください
             databaseURL: "https://realtime-database-c26e9-default-rtdb.asia-southeast1.firebasedatabase.app"
         };
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        document.getElementById('sendBtn').onclick = async () => {
-            const password = document.getElementById('pass').value;
-            const message = document.getElementById('msg').value;
+        // パスワードと表示メッセージの対応表
+        const messageMaster = {
+            "red": "情熱の扉が開いた！次の場所は「図書室」だ。",
+            "blue": "静寂の鍵が見つかった。ピアノの裏を調べろ。",
+            "green": "森の精霊が目覚めた。合言葉は「ミドリ」だ。"
+        };
 
-            // パスワードが合っていたら書き込み
-            if (password === "open") { 
-                await set(ref(db, 'mystery/displayText'), message);
-                alert("送信しました！モニターを確認してください。");
+        document.getElementById('sendBtn').onclick = async () => {
+            const password = document.getElementById('pass').value.toLowerCase(); // 小文字に統一
+            
+            // パスワードがマスター表に存在するかチェック
+            if (messageMaster[password]) {
+                const targetMessage = messageMaster[password];
+                await set(ref(db, 'mystery/displayText'), targetMessage);
+                alert("モニターを更新しました！");
+                document.getElementById('pass').value = ""; // 入力欄をクリア
             } else {
-                alert("パスワードが正しくありません。");
+                alert("そのキーワードは正しくありません。");
             }
         };
     </script>
