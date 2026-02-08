@@ -15,14 +15,13 @@
             margin: 0;
             font-family: 'Courier New', monospace; 
             overflow: hidden;
-            transition: background 0.1s;
+            transition: color 0.5s;
         }
 
         /* --- 特殊モード（バグ演出） --- */
         body.special-mode {
-            background: #100;
             color: #f00;
-            animation: shake 0.15s infinite; /* 常に微振動 */
+            animation: shake 0.1s infinite;
         }
 
         #output { 
@@ -33,54 +32,63 @@
             text-align: center;
             white-space: pre-wrap;
             position: relative;
+            z-index: 5;
         }
 
         body.special-mode #output {
-            text-shadow: 2px 2px #f00, -2px -2px #0ff;
-            animation: glitch 0.2s infinite;
+            text-shadow: 2px 0 #f00, -2px 0 #0ff;
+            animation: glitch-text 0.2s infinite;
+        }
+
+        /* --- 砂嵐（ノイズ）演出 --- */
+        #noise-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: url('https://upload.wikimedia.org/wikipedia/commons/5/5a/Canal_9_Static.gif'); /* 砂嵐画像 */
+            opacity: 0;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        /* 移行時のアニメーションクラス */
+        .transitioning #noise-overlay {
+            animation: noise-burst 0.8s steps(1) forwards;
+        }
+
+        @keyframes noise-burst {
+            0% { opacity: 0; }
+            10% { opacity: 0.8; }
+            30% { opacity: 1; filter: invert(1); }
+            50% { opacity: 1; }
+            80% { opacity: 1; }
+            90% { opacity: 0; } /* ここでブラックアウト */
+            100% { opacity: 0; }
         }
 
         /* 画面の揺れ */
         @keyframes shake {
             0% { transform: translate(0,0); }
-            25% { transform: translate(2px, 2px); }
-            50% { transform: translate(-2px, -2px); }
-            75% { transform: translate(2px, -2px); }
-            100% { transform: translate(0,0); }
+            50% { transform: translate(-3px, 2px); }
+            100% { transform: translate(3px, -2px); }
         }
 
         /* 文字のグリッチ */
-        @keyframes glitch {
-            0% { transform: skew(0deg); }
-            20% { transform: skew(2deg); opacity: 0.9; }
-            50% { transform: skew(-2deg); color: #fff; }
-            80% { transform: skew(5deg); }
-            100% { transform: skew(0deg); }
-        }
-
-        /* ノイズ走査線 */
-        body.special-mode::before {
-            content: " ";
-            position: absolute;
-            top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%), 
-                        linear-gradient(90deg, rgba(255, 0, 0, 0.05), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.05));
-            background-size: 100% 4px, 4px 100%;
-            pointer-events: none;
-            z-index: 10;
+        @keyframes glitch-text {
+            0% { clip-path: inset(10% 0 30% 0); transform: translate(-2px); }
+            50% { clip-path: inset(50% 0 10% 0); transform: translate(2px); }
+            100% { clip-path: inset(20% 0 60% 0); transform: translate(0); }
         }
 
         #output::after {
             content: "|";
             animation: blink 1s infinite;
         }
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0; }
-        }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
     </style>
 </head>
 <body>
+    <div id="noise-overlay"></div>
+    
     <div id="output">システム待機中...</div>
 
     <script type="module">
@@ -102,6 +110,7 @@
 
         const outputElement = document.getElementById('output');
         let typeTimer = null;
+        let currentMode = "normal";
 
         function typeWriter(text, speed = 70) {
             if (typeTimer) clearInterval(typeTimer);
@@ -129,29 +138,33 @@
         const modeRef = ref(db, 'mystery/mode');
 
         onValue(modeRef, (modeSnapshot) => {
-            const mode = modeSnapshot.val();
-            const isSpecial = (mode === "special");
-
-            if (isSpecial) {
-                document.body.classList.add('special-mode');
-            } else {
+            const nextMode = modeSnapshot.val();
+            
+            // モードが「normal -> special」へ変わる瞬間の演出
+            if (currentMode === "normal" && nextMode === "special") {
+                document.body.classList.add('transitioning');
+                // ノイズとブラックアウトの後に赤文字化
+                setTimeout(() => {
+                    document.body.classList.remove('transitioning');
+                    document.body.classList.add('special-mode');
+                }, 800);
+            } else if (nextMode === "normal") {
                 document.body.classList.remove('special-mode');
             }
+            
+            currentMode = nextMode;
 
             onValue(messagesRef, (msgSnapshot) => {
                 const list = msgSnapshot.val();
-                
                 if (!list || list.length === 0) {
                     typeWriter("システム待機中...\nキーワードを入力してください。");
                     return;
                 }
 
-                if (isSpecial) {
-                    // 特殊モード：バグりながら一気に全表示
+                if (currentMode === "special") {
                     const specialContent = "【緊急読込モード発動】\n全解析データを同期しました：\n\n" + list.join(" ");
                     typeWriter(specialContent, 20); 
                 } else {
-                    // 通常モード（ご提示いただいた文言）
                     const count = list.length;
                     if (count === 1) {
                         typeWriter("キーワードを1つ受信しました。\n残り2つです。");
