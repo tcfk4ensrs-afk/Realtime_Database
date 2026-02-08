@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>メインモニター</title>
     <style>
         body { 
             background: #000; 
@@ -14,15 +15,61 @@
             margin: 0;
             font-family: 'Courier New', monospace; 
             overflow: hidden;
+            transition: background 0.1s;
         }
+
+        /* --- 特殊モード（バグ演出） --- */
+        body.special-mode {
+            background: #100;
+            color: #f00;
+            animation: shake 0.15s infinite; /* 常に微振動 */
+        }
+
         #output { 
             font-size: 3.5vw; 
             text-shadow: 0 0 10px #0f0; 
             width: 85%;
             line-height: 1.8;
             text-align: center;
-            white-space: pre-wrap; /* 改行を有効にする */
+            white-space: pre-wrap;
+            position: relative;
         }
+
+        body.special-mode #output {
+            text-shadow: 2px 2px #f00, -2px -2px #0ff;
+            animation: glitch 0.2s infinite;
+        }
+
+        /* 画面の揺れ */
+        @keyframes shake {
+            0% { transform: translate(0,0); }
+            25% { transform: translate(2px, 2px); }
+            50% { transform: translate(-2px, -2px); }
+            75% { transform: translate(2px, -2px); }
+            100% { transform: translate(0,0); }
+        }
+
+        /* 文字のグリッチ */
+        @keyframes glitch {
+            0% { transform: skew(0deg); }
+            20% { transform: skew(2deg); opacity: 0.9; }
+            50% { transform: skew(-2deg); color: #fff; }
+            80% { transform: skew(5deg); }
+            100% { transform: skew(0deg); }
+        }
+
+        /* ノイズ走査線 */
+        body.special-mode::before {
+            content: " ";
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.05), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.05));
+            background-size: 100% 4px, 4px 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
         #output::after {
             content: "|";
             animation: blink 1s infinite;
@@ -38,7 +85,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-        import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDj3T3b4fdLD83kC_RAp2Wg5cFw7VE_x0s",
@@ -56,8 +103,7 @@
         const outputElement = document.getElementById('output');
         let typeTimer = null;
 
-        // タイピング演出関数
-        function typeWriter(text) {
+        function typeWriter(text, speed = 70) {
             if (typeTimer) clearInterval(typeTimer);
             outputElement.innerText = "";
             let i = 0;
@@ -68,10 +114,9 @@
                 } else {
                     clearInterval(typeTimer);
                 }
-            }, 70); 
+            }, speed); 
         }
 
-        // 配列をシャッフルする関数（フィッシャー–イェーツのシャッフル）
         function shuffle(array) {
             for (let i = array.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
@@ -80,29 +125,46 @@
             return array;
         }
 
-      // 'mystery/messages' を監視
-const messagesRef = ref(db, 'mystery/messages');
-onValue(messagesRef, (snapshot) => {
-    const list = snapshot.val(); // snapshot.val() が null の場合を考慮
-    
-    // データがない（リセットされた）場合
-    if (!list || list.length === 0) {
-        typeWriter("システム待機中...\nキーワードを入力してください。");
-        return;
-    }
+        const messagesRef = ref(db, 'mystery/messages');
+        const modeRef = ref(db, 'mystery/mode');
 
-    const count = list.length;
-    if (count === 1) {
-        typeWriter("キーワードを1つ受信しました。\n残り2つです。");
-    } else if (count === 2) {
-        typeWriter("キーワードを2つ受信しました。\n残り1つです。");
-    } else if (count >= 3) {
-        // 3つ揃った！
-        const shuffled = shuffle([...list]);
-        const finalContent = "必要なキーワードをすべて送ってください。"\n\n" + shuffled.join("\n");
-        typeWriter(finalContent);
-    }
-});
+        onValue(modeRef, (modeSnapshot) => {
+            const mode = modeSnapshot.val();
+            const isSpecial = (mode === "special");
+
+            if (isSpecial) {
+                document.body.classList.add('special-mode');
+            } else {
+                document.body.classList.remove('special-mode');
+            }
+
+            onValue(messagesRef, (msgSnapshot) => {
+                const list = msgSnapshot.val();
+                
+                if (!list || list.length === 0) {
+                    typeWriter("システム待機中...\nキーワードを入力してください。");
+                    return;
+                }
+
+                if (isSpecial) {
+                    // 特殊モード：バグりながら一気に全表示
+                    const specialContent = "【緊急読込モード発動】\n全解析データを同期しました：\n\n" + list.join(" ");
+                    typeWriter(specialContent, 20); 
+                } else {
+                    // 通常モード（ご提示いただいた文言）
+                    const count = list.length;
+                    if (count === 1) {
+                        typeWriter("キーワードを1つ受信しました。\n残り2つです。");
+                    } else if (count === 2) {
+                        typeWriter("キーワードを2つ受信しました。\n残り1つです。");
+                    } else if (count >= 3) {
+                        const shuffled = shuffle([...list]);
+                        const finalContent = "必要なキーワードをすべて送ってください。\n\n" + shuffled.join("\n");
+                        typeWriter(finalContent);
+                    }
+                }
+            });
+        });
     </script>
 </body>
 </html>
