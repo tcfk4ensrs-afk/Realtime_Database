@@ -80,28 +80,29 @@
             return array;
         }
 
-        // 'mystery/messages'（溜まっているメッセージのリスト）を監視
-        const messagesRef = ref(db, 'mystery/messages');
-        onValue(messagesRef, (snapshot) => {
-            const list = snapshot.val() || [];
-            const count = list.length;
+      // 'mystery/messages' を監視
+const messagesRef = ref(db, 'mystery/messages');
+onValue(messagesRef, (snapshot) => {
+    const list = snapshot.val(); // snapshot.val() が null の場合を考慮
+    
+    // データがない（リセットされた）場合
+    if (!list || list.length === 0) {
+        typeWriter("システム待機中...\nキーワードを入力してください。");
+        return;
+    }
 
-            if (count === 0) {
-                typeWriter("システム待機中...\nキーワードを入力してください。");
-            } else if (count === 1) {
-                typeWriter("キーワードを1つ受信しました。\n残り2つです。");
-            } else if (count === 2) {
-                typeWriter("キーワードを2つ受信しました。\n残り1つです。");
-            } else if (count >= 3) {
-                // 3つ揃った！ランダムに並び替えて表示
-                const shuffled = shuffle([...list]);
-                const finalContent = "全てのキーワードが揃いました。\n\n" + shuffled.join("\n");
-                typeWriter(finalContent);
-                
-                // 5秒後にリストをリセットしたい場合は以下を有効にします
-                // setTimeout(() => { set(messagesRef, null); }, 30000);
-            }
-        });
+    const count = list.length;
+    if (count === 1) {
+        typeWriter("キーワードを1つ受信しました。\n残り2つです。");
+    } else if (count === 2) {
+        typeWriter("キーワードを2つ受信しました。\n残り1つです。");
+    } else if (count >= 3) {
+        // 3つ揃った！
+        const shuffled = shuffle([...list]);
+        const finalContent = "全てのキーワードが揃いました。\n\n" + shuffled.join("\n");
+        typeWriter(finalContent);
+    }
+});
     </script>
 </body>
 </html>
