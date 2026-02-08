@@ -4,17 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>プレイヤー操作パネル</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #eef2f3; }
+        .container { max-width: 400px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        input { padding: 12px; margin: 15px 0; width: 100%; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
+        button { padding: 12px 24px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; width: 100%; }
+        button:hover { background: #0056b3; }
+        .hint { font-size: 0.9rem; color: #666; margin-bottom: 20px; }
+    </style>
 </head>
 <body>
-    <h1>謎解き入力</h1>
-    <p>ヒント：正しいキーワードを入力して送信してください。</p>
-    <input type="text" id="pass" placeholder="キーワードを入力">
-    <button id="sendBtn">送信する</button>
+    <div class="container">
+        <h1>謎解き入力</h1>
+        <p class="hint">正しいキーワードを入力して、モニターのロックを解除してください。</p>
+        
+        <input type="text" id="pass" placeholder="キーワードを入力">
+        <button id="sendBtn">送信する</button>
+    </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-        import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
+        import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
 
+        // --- Firebase設定 ---
         const firebaseConfig = {
             apiKey: "AIzaSyDj3T3b4fdLD83kC_RAp2Wg5cFw7VE_x0s",
             authDomain: "realtime-database-c26e9.firebaseapp.com",
@@ -28,22 +40,42 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // パスワードと表示メッセージの対応表
+        // --- パスワードとメッセージの対応表 ---
         const messageMaster = {
-            "red": "情熱の扉が開いた！次の場所は「図書室」だ。",
-            "blue": "静寂の鍵が見つかった。ピアノの裏を調べろ。",
-            "green": "森の精霊が目覚めた。合言葉は「ミドリ」だ。"
+            "red": "【情熱の断片】: 炎の像の台座を確認せよ。",
+            "blue": "【静寂の断片】: 水槽の底に沈む鍵を拾え。",
+            "green": "【生命の断片】: 温室の3番目の鉢植えを調べよ。"
         };
 
         document.getElementById('sendBtn').onclick = async () => {
-            const password = document.getElementById('pass').value.toLowerCase(); // 小文字に統一
+            const password = document.getElementById('pass').value.toLowerCase().trim();
             
-            // パスワードがマスター表に存在するかチェック
             if (messageMaster[password]) {
                 const targetMessage = messageMaster[password];
-                await set(ref(db, 'mystery/displayText'), targetMessage);
-                alert("モニターを更新しました！");
-                document.getElementById('pass').value = ""; // 入力欄をクリア
+                const messagesRef = ref(db, 'mystery/messages');
+
+                try {
+                    // 現在のメッセージリストを読み取る
+                    const snapshot = await get(messagesRef);
+                    let currentList = snapshot.val() || [];
+
+                    // もし既に3つ揃ってリセットされていた後の最初の入力なら、空にする
+                    if (currentList.length >= 3) {
+                        currentList = [];
+                    }
+
+                    // リストに今回のメッセージを追加
+                    currentList.push(targetMessage);
+
+                    // Firebaseに更新したリストを書き込む
+                    await set(messagesRef, currentList);
+
+                    alert("キーワードを送信しました！モニターの反応を確認してください。");
+                    document.getElementById('pass').value = ""; // 入力欄をリセット
+                } catch (error) {
+                    console.error("エラーが発生しました:", error);
+                    alert("送信に失敗しました。通信環境を確認してください。");
+                }
             } else {
                 alert("そのキーワードは正しくありません。");
             }
