@@ -3,98 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>プレイヤー操作パネル</title>
+    <title>操作パネル</title>
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #eef2f3; }
-        .container { max-width: 400px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        input { padding: 12px; margin: 15px 0; width: 100%; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
-        button { padding: 12px 24px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; width: 100%; }
-        button:hover { background: #0056b3; }
-        .hint { font-size: 0.9rem; color: #666; margin-bottom: 20px; }
+        body { font-family: sans-serif; text-align: center; padding: 20px; background: #eef2f3; }
+        .box { max-width: 450px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .cipher { background: #eee; padding: 15px; font-size: 1.4rem; letter-spacing: 2px; border: 2px dashed #333; margin: 15px 0; }
+        input { padding: 12px; width: 80%; margin: 10px 0; border-radius: 5px; border: 1px solid #ccc; }
+        button { padding: 12px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>謎解き入力</h1>
-        <p class="hint">正しいキーワードを入力して、モニターのロックを解除してください。</p>
-        
-        <input type="text" id="pass" placeholder="キーワードを入力">
-        <button id="sendBtn">送信する</button>
-    </div>
+    <div id="main-content" class="box">読み込み中...</div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
         import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
 
-        // --- Firebase設定 ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyDj3T3b4fdLD83kC_RAp2Wg5cFw7VE_x0s",
-            authDomain: "realtime-database-c26e9.firebaseapp.com",
-            projectId: "realtime-database-c26e9",
-            storageBucket: "realtime-database-c26e9.firebasestorage.app",
-            messagingSenderId: "397939201496",
-            appId: "1:397939201496:web:3b651c82fdbda090ee4ead",
-            databaseURL: "https://realtime-database-c26e9-default-rtdb.asia-southeast1.firebasedatabase.app"
-        };
-
+        const firebaseConfig = { /* 上記と同じ */ };
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // --- パスワードとメッセージの対応表 ---
-        const messageMaster = {
-            "red": "【情熱の断片】: 炎の像の台座を確認せよ。",
-            "blue": "【静寂の断片】: 水槽の底に沈む鍵を拾え。",
-            "green": "【生命の断片】: 温室の3番目の鉢植えを調べよ。"
-        };
+        const myId = localStorage.getItem('mystery_user_id');
+        const params = new URLSearchParams(window.location.search);
+        const tagId = params.get('id');
 
-       document.getElementById('sendBtn').onclick = async () => {
-    const password = document.getElementById('pass').value.toLowerCase().trim();
-    const messagesRef = ref(db, 'mystery/messages');
+        // ひらがな -> ローマ字マップ (簡易版：必要に応じて拡張)
+        const kanaMap = {'あ':'A','い':'I','う':'U','え':'E','お':'O','か':'KA','き':'KI','く':'KU','け':'KE','こ':'KO','さ':'SA','し':'SHI','す':'SU','せ':'SE','そ':'SO','た':'TA','ち':'CHI','つ':'TSU','て':'TE','と':'TO','な':'NA','に':'NI','ぬ':'NU','ね':'NE','の':'NO','は':'HA','ひ':'HI','ふ':'FU','へ':'HE','ほ':'HO','ま':'MA','み':'MI','む':'MU','め':'ME','も':'MO','や':'YA','ゆ':'YU','よ':'YO','ら':'RA','り':'RI','る':'RU','れ':'RE','ろ':'RO','わ':'WA','を':'WO','ん':'N'};
 
-    // --- 「リセット」と入力された場合の処理 ---
-    if (password === "リセット" || password === "reset") {
-        if (confirm("全てのキーワードをリセットして初期状態に戻しますか？")) {
-            await set(messagesRef, null); // データを空にする
-            alert("システムをリセットしました。");
-            document.getElementById('pass').value = "";
+        function toCipher(name) {
+            let roman = "";
+            for (let char of name) { roman += kanaMap[char] || ""; }
+            return roman.split('').map(c => c.charCodeAt(0) - 64).join(", ");
         }
-        return; // 処理終了
-    }
 
-    // --- 通常のパスワード判定 ---
-    if (messageMaster[password]) {
-        const targetMessage = messageMaster[password];
-        try {
-            const snapshot = await get(messagesRef);
-            let currentList = snapshot.val() || [];
+        async function init() {
+            const tagSnapshot = await get(ref(db, `tags/${tagId}`));
+            const data = tagSnapshot.val();
 
-            // 既に3つある場合は、リセットを促すか自動で空にする
-            if (currentList.length >= 3) {
-                if(confirm("既に3つ揃っています。リセットして新しく登録しますか？")) {
-                    currentList = [];
-                } else {
-                    return;
-                }
+            if (data.ownerId === myId) {
+                // 本人画面
+                document.getElementById('main-content').innerHTML = `
+                    <h2>自分のタグ：${data.playerName}</h2>
+                    <p>他人にこのタグを読み取らせて、問題を解いてもらおう！</p>
+                    <input type="text" id="resetInput" placeholder="リセットと入力してリセット">
+                    <button id="resetBtn">リセット実行</button>
+                `;
+                document.getElementById('resetBtn').onclick = () => handleInput("リセット");
+            } else {
+                // 他人画面：暗号生成
+                const cipherText = toCipher(data.playerName);
+                document.getElementById('main-content').innerHTML = `
+                    <h2>${data.playerName}のタグを解析</h2>
+                    <p>暗号を解き、キーワードを導け</p>
+                    <div class="cipher">${cipherText}</div>
+                    <input type="text" id="ansInput" placeholder="答えを入力">
+                    <button id="sendBtn">送信</button>
+                `;
+                document.getElementById('sendBtn').onclick = () => handleInput(document.getElementById('ansInput').value);
+            }
+        }
+
+        async function handleInput(val) {
+            const modeRef = ref(db, 'mystery/mode');
+            const msgRef = ref(db, 'mystery/messages');
+            
+            if (val === "リセット") {
+                await set(msgRef, null);
+                await set(modeRef, "normal");
+                alert("全消去完了"); return;
             }
 
-            // 二重投稿防止
-            if (currentList.includes(targetMessage)) {
-                alert("そのキーワードは既に送信済みです。");
-                return;
+            // 本来はここで正解判定。今回は仮のmessageMasterを使用
+            const messageMaster = {"あした": "た", "くさり": "な"};
+            const result = messageMaster[val];
+            if (result) {
+                const snap = await get(msgRef);
+                let list = snap.val() || [];
+                if (list.length >= 3) list = [];
+                list.push(result);
+                await set(msgRef, list);
+                alert("送信成功！");
+            } else {
+                alert("不正解");
             }
-
-            currentList.push(targetMessage);
-            await set(messagesRef, currentList);
-
-            alert("キーワードを送信しました！");
-            document.getElementById('pass').value = "";
-        } catch (error) {
-            alert("送信に失敗しました。");
         }
-    } else {
-        alert("キーワードが正しくありません。");
-    }
-};
+        init();
     </script>
 </body>
 </html>
