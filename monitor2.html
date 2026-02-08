@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>メインモニター</title>
+    <title>メインモニター - 高度解析システム</title>
     <style>
         body { 
             background: #000; 
@@ -15,13 +15,7 @@
             margin: 0;
             font-family: 'Courier New', monospace; 
             overflow: hidden;
-            transition: color 0.5s;
-        }
-
-        /* --- 特殊モード（バグ演出） --- */
-        body.special-mode {
-            color: #f00;
-            animation: shake 0.1s infinite;
+            transition: color 0.2s;
         }
 
         #output { 
@@ -35,61 +29,58 @@
             z-index: 5;
         }
 
-        body.special-mode #output {
-            text-shadow: 2px 0 #f00, -2px 0 #0ff;
-            animation: glitch-text 0.2s infinite;
+        /* --- 演出用：文字化け・崩壊 --- */
+        .corrupting {
+            animation: glitch-corrupt 0.1s infinite;
+            filter: blur(1px);
+        }
+        @keyframes glitch-corrupt {
+            0% { transform: translate(2px, -2px); }
+            50% { transform: translate(-2px, 2px) skew(10deg); opacity: 0.8; }
+            100% { transform: translate(0,0); }
         }
 
-        /* --- 砂嵐（ノイズ）演出 --- */
-        #noise-overlay {
+        /* --- 演出用：ノイズレイヤー --- */
+        #noise-screen {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: url('https://upload.wikimedia.org/wikipedia/commons/5/5a/Canal_9_Static.gif'); /* 砂嵐画像 */
+            background: url('https://upload.wikimedia.org/wikipedia/commons/5/5a/Canal_9_Static.gif');
             opacity: 0;
             pointer-events: none;
             z-index: 100;
         }
 
-        /* 移行時のアニメーションクラス */
-        .transitioning #noise-overlay {
-            animation: noise-burst 0.8s steps(1) forwards;
+        /* 砂嵐の制御 */
+        .show-noise { opacity: 0.5 !important; }
+        .full-noise { opacity: 1.0 !important; }
+
+        /* --- 特殊モード（起動後） --- */
+        body.special-mode {
+            background: #000;
+            color: #f00; /* 赤文字 */
+        }
+        body.special-mode #output {
+            text-shadow: 0 0 15px #f00; /* 視認性のためノイズは消すが、発光は強める */
         }
 
-        @keyframes noise-burst {
-            0% { opacity: 0; }
-            10% { opacity: 0.8; }
-            30% { opacity: 1; filter: invert(1); }
-            50% { opacity: 1; }
-            80% { opacity: 1; }
-            90% { opacity: 0; } /* ここでブラックアウト */
-            100% { opacity: 0; }
+        /* --- シャットダウン演出用：画面が閉じる線 --- */
+        #shutdown-line {
+            position: fixed;
+            top: 50%; left: 0; width: 100%; height: 2px;
+            background: #fff;
+            transform: scaleX(0);
+            z-index: 101;
+            display: none;
         }
 
-        /* 画面の揺れ */
-        @keyframes shake {
-            0% { transform: translate(0,0); }
-            50% { transform: translate(-3px, 2px); }
-            100% { transform: translate(3px, -2px); }
-        }
-
-        /* 文字のグリッチ */
-        @keyframes glitch-text {
-            0% { clip-path: inset(10% 0 30% 0); transform: translate(-2px); }
-            50% { clip-path: inset(50% 0 10% 0); transform: translate(2px); }
-            100% { clip-path: inset(20% 0 60% 0); transform: translate(0); }
-        }
-
-        #output::after {
-            content: "|";
-            animation: blink 1s infinite;
-        }
+        #output::after { content: "|"; animation: blink 1s infinite; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
     </style>
 </head>
 <body>
-    <div id="noise-overlay"></div>
-    
-    <div id="output">システム待機中...</div>
+    <div id="noise-screen"></div>
+    <div id="shutdown-line"></div>
+    <div id="output">SYSTEM READY...</div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
@@ -109,6 +100,8 @@
         const db = getDatabase(app);
 
         const outputElement = document.getElementById('output');
+        const noiseScreen = document.getElementById('noise-screen');
+        const shutdownLine = document.getElementById('shutdown-line');
         let typeTimer = null;
         let currentMode = "normal";
 
@@ -126,57 +119,80 @@
             }, speed); 
         }
 
-        function shuffle(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
-            }
-            return array;
+        // 文字化け生成関数
+        function getGarbageText(length) {
+            const chars = "ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ@#$%&*?<>∑Ω≈";
+            return Array.from({length}, () => chars[Math.floor(Math.random()*chars.length)]).join("");
         }
 
-        const messagesRef = ref(db, 'mystery/messages');
-        const modeRef = ref(db, 'mystery/mode');
+        async function triggerSpecialSequence(list) {
+            // 1. 文字化け開始
+            outputElement.classList.add('corrupting');
+            let count = 0;
+            const corruptInterval = setInterval(() => {
+                outputElement.innerText = getGarbageText(50);
+                if (count++ > 20) {
+                    clearInterval(corruptInterval);
+                    // 2. ノイズ発生
+                    noiseScreen.classList.add('show-noise');
+                    setTimeout(shutdown, 500);
+                }
+            }, 100);
 
-        onValue(modeRef, (modeSnapshot) => {
-            const nextMode = modeSnapshot.val();
-            
-            // モードが「normal -> special」へ変わる瞬間の演出
-            if (currentMode === "normal" && nextMode === "special") {
-                document.body.classList.add('transitioning');
-                // ノイズとブラックアウトの後に赤文字化
+            function shutdown() {
+                // 3. シャットダウン
+                noiseScreen.classList.remove('show-noise');
+                outputElement.innerText = "";
+                shutdownLine.style.display = "block";
+                shutdownLine.style.transform = "scaleX(1)";
                 setTimeout(() => {
-                    document.body.classList.remove('transitioning');
-                    document.body.classList.add('special-mode');
-                }, 800);
-            } else if (nextMode === "normal") {
-                document.body.classList.remove('special-mode');
+                    shutdownLine.style.transform = "scaleX(0)";
+                    // 4. ブラックアウト（静寂）
+                    setTimeout(reboot, 1500);
+                }, 200);
             }
-            
-            currentMode = nextMode;
 
-            onValue(messagesRef, (msgSnapshot) => {
-                const list = msgSnapshot.val();
-                if (!list || list.length === 0) {
-                    typeWriter("システム待機中...\nキーワードを入力してください。");
+            function reboot() {
+                // 5. 再起動ノイズ
+                noiseScreen.classList.add('full-noise');
+                setTimeout(() => {
+                    // 6. 完了：赤文字モードへ
+                    noiseScreen.classList.remove('full-noise');
+                    document.body.classList.add('special-mode');
+                    const specialContent = "【緊急読込モード発動】\n全解析データを同期しました：\n\n" + list.join(" ");
+                    typeWriter(specialContent, 30);
+                }, 800);
+            }
+        }
+
+        onValue(ref(db, 'mystery/mode'), (modeSnap) => {
+            const nextMode = modeSnap.val();
+            const messagesRef = ref(db, 'mystery/messages');
+
+            onValue(messagesRef, (msgSnap) => {
+                const list = msgSnap.val() || [];
+                
+                if (currentMode === "normal" && nextMode === "special") {
+                    currentMode = "special";
+                    triggerSpecialSequence(list);
                     return;
                 }
 
-                if (currentMode === "special") {
-                    const specialContent = "【緊急読込モード発動】\n全解析データを同期しました：\n\n" + list.join(" ");
-                    typeWriter(specialContent, 20); 
-                } else {
-                    const count = list.length;
-                    if (count === 1) {
+                if (nextMode === "normal") {
+                    currentMode = "normal";
+                    document.body.classList.remove('special-mode');
+                    outputElement.classList.remove('corrupting');
+                    if (list.length === 0) {
+                        typeWriter("システム待機中...\nキーワードを入力してください。");
+                    } else if (list.length === 1) {
                         typeWriter("キーワードを1つ受信しました。\n残り2つです。");
-                    } else if (count === 2) {
+                    } else if (list.length === 2) {
                         typeWriter("キーワードを2つ受信しました。\n残り1つです。");
-                    } else if (count >= 3) {
-                        const shuffled = shuffle([...list]);
-                        const finalContent = "必要なキーワードをすべて送ってください。\n\n" + shuffled.join("\n");
-                        typeWriter(finalContent);
+                    } else {
+                        typeWriter("必要なキーワードをすべて送ってください。\n\n" + [...list].reverse().join("\n"));
                     }
                 }
-            });
+            }, { onlyOnce: (currentMode === "special") });
         });
     </script>
 </body>
